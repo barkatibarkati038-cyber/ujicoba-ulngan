@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CBT Ujian - Bahasa Arab Kelas VIII</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM 18 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { user-select: none; -webkit-user-select: none; }
+        /* Mencegah highlight biru saat klik di mobile */
+        * { -webkit-tap-highlight-color: transparent; }
+        /* Mencegah scrollbar muncul ganda */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-cyan-600 to-blue-800 min-h-screen text-slate-800 font-sans" oncontextmenu="return false;">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // ==========================================
+        // 1. KONFIGURASI UJIAN
+        // ==========================================
+        const EXAM_CONFIG = {
+            mapel: "Bahasa Arab",
+            jenisUjian: "SUMATIF AKHIR JENJANG (SAJ) 2026/2027",
+            kelas: "VIII",
+            durasiMenit: 60,
+            storageKey: "cbt_Bahasa Arab_VIII",
+            googleSheetUrl: "https://script.google.com/macros/s/AKfycbydw7TKOce4eEgLvDgNDaQubeM3y262mzvi5xWYQZhddeCGB0KvUQ9--QwYPSIHqZat/exec" // GANTI DENGAN URL DEPLOY GOOGLE APPS SCRIPT ANDA
+        };
+
+        // ==========================================
+        // 2. DATA SOAL (Diekstrak dari PDF)
+        // ==========================================
+        const rawQuestionsData = [
+            {
+                id: 1, type: "mc",
+                text: "مَا صِفَةُ المَدْرَسَةِ فِي النَّص السَّابِقِ؟ (Apa sifat/kondisi sekolah pada teks bacaan di atas?)",
+                image: "https://placehold.co/600x400/0891b2/ffffff?text=GAMBAR_SOAL_NO_1",
+                options: [
+                    "المَدْرَسَةُ صَغِيْرَةٌ وَمُتَّسِخَةٌ",
+                    "المَدْرَسَةُ كَبِيرَةٌ وَجَمِيلَةٌ وَنَظِيفَةٌ",
+                    "المَدْرَسَةُ ضَيِّقَةٌ وَقَبِيحَةٌ",
+                    "المَدْرَسَةُ بَعِيدَةً وَقَدِيمَةٌ"
+                ],
+                answer: "المَدْرَسَةُ كَبِيرَةٌ وَجَمِيلَةٌ وَنَظِيفَةٌ"
+            },
+            {
+                id: 2, type: "mc",
+                text: "(SOAL CERITA 1)\nأَحْمَدُ طَالِبٌ مَرِيضٌ فِي الفَصْلِ. يَذْهَبُ أَحْمَدُ إِلَى ... لِلإِسْتِرَاحَةِ وَالعِلاج (Ahmad adalah siswa yang sakit di kelas. Ahmad pergi ke ... untuk beristirahat dan berobat).",
+                image: "https://placehold.co/600x400/0891b2/ffffff?text=GAMBAR_SOAL_NO_2",
+                options: [
+                    "غُرْفَةِ المُدَرِّسِ",
+                    "غُرْفَةِ السُّوُوْنِ الإِدَارِيَّةِ",
+                    "غُرْفَةِ الصِّحَّةِ",
+                    "غُرْفَةِ الحَارِسِ"
+                ],
+                answer: "غُرْفَةِ الصِّحَّةِ"
+            },
+            {
+                id: 3, type: "mc",
+                text: "أَيْنَ يَقَعُ الْمَيْدَانُ كَمَا فِي النَّصَّ السَّابِقِ؟ (Di manakah letak lapangan seperti dalam teks di atas?)",
+                options: ["وَرَاءَ المَدْرَسَةِ", "أَمَامَ المَدْرَسَةِ", "جَانِبَ الْمَقْصَفِ", "تَحْتَ المِصْعَدِ"],
+                answer: "أَمَامَ المَدْرَسَةِ"
+            },
+            {
+                id: 4, type: "mc",
+                text: "مَا مَعْنَى كَلِمَةٍ 'المَقْصَفُ' فِي النَّص السَّابِقِ؟ (Apa arti kata 'المقصف' pada teks di atas?)",
+                options: ["Kantin", "Perpustakaan", "Laboratorium", "Ruang Guru"],
+                answer: "Kantin"
+            },
+            {
+                id: 5, type: "mc",
+                text: "(SOAL CERITA 2)\n.... فَاطِمَةُ وَصَدِيقَاتُهَا يَذْهَبْنَ إِلَى المَقْصَفِ فِي وَقْتِ الإِسْتِرَاحَةِ الْمَقْصَفُ فِي مَدْرَسَتِنَا (Fatimah dan teman-temannya pergi ke kantin pada jam istirahat. Kantin di sekolah kami ...)",
+                image: "https://placehold.co/600x400/0891b2/ffffff?text=GAMBAR_SOAL_NO_5",
+                options: ["نظيفة", "نظيف", "النظيف", "نظيفًا"],
+                answer: "نظيف"
+            },
+            {
+                id: 6, type: "mc",
+                text: "مَا هُوَ ضِدُّ (عَكْسُ) كَلِمَةٍ 'بَعِيدٌ'؟ (Apakah lawan kata / antonim dari kata 'بعيد'?)",
+                options: ["كَبِيرٌ", "قَرِيبٌ", "طويل", "كَثِيرٌ"],
+                answer: "قَرِيبٌ"
+            },
+            {
+                id: 7, type: "mc",
+                text: "(SOAL PERNYATAAN 1)\nإِخْتَرْ زَوْجَ الكَلِمَاتِ الصَّحِيحَةُ لِلصِّفَةِ وَعَكْسِهَا (Pilihlah pasangan kata sifat dan lawan kata / antonim yang BENAR):\n1) مُتَّسِحْ X نَظِيفٌ\n2) قَلِيلٌ X كَثِيرٌ\n3) طَوِيلٌ X وَاسِعٌ\n4) كَسْلَانُ X مَا هِرٌ\nالرَّقْمَانِ الصَّحِيْحَانِ هُمَا ....",
+                options: ["(1) dan (2)", "(1) dan (3)", "(2) dan (3)", "(3) dan (4)"],
+                answer: "(1) dan (2)"
+            },
+            {
+                id: 8, type: "mc",
+                text: "مَا اسْمُ الْغُرْفَةِ الَّتِي يَعْمَلُ فِيهَا رَئِيسُ المَدْرَسَةِ؟ (Apa nama ruangan tempat bekerja Kepala Sekolah?)",
+                options: ["غُرْفَةُ الْحَارِسِ", "غُرْفَةُ رَئِيسِ المَدْرَسَةِ", "غُرْفَةُ الإِشْرَافِ", "المَلْعَبُ"],
+                answer: "غُرْفَةُ رَئِيسِ المَدْرَسَةِ"
+            },
+            {
+                id: 9, type: "mc",
+                text: "(SOAL CERITA 3)\n.... يَلْعَبُ الطَّلَابُ كُرَةَ القَدَم فِي المَيْدَانِ الْكَبِيرِ الْمَيْدَانُ فِي مَدْرَسَتِنَا (Siswa-siswa bermain sepak bola di lapangan besar. Lapangan di sekolah kami...)",
+                image: "https://placehold.co/600x400/0891b2/ffffff?text=GAMBAR_SOAL_NO_9",
+                options: ["واسعة", "واسع", "ضيقة", "كَبِيرَةً"],
+                answer: "واسع"
+            },
+            {
+                id: 10, type: "mc",
+                text: "مَا ضِدُّ عَكْسُ) كَلِمَةٍ مَاهِرٌ (Pandai/Pintar)?",
+                options: ["كسلان", "جَاهِلٌ", "قَبِيحٌ", "ثقيل"],
+                answer: "جَاهِلٌ"
+            },
+            {
+                id: 11, type: "mc",
+                text: "أَيُّ جُمْلَةٍ مِنَ الجُمَلِ الآتِيَةِ جُمْلَةً صَحِيحَةً فِي الْمُبْتَدَأَ وَالْخَبَرِ ؟ (Manakah dari kalimat berikut yang merupakan susunan Mubtada' dan Khabar yang benar?)",
+                options: ["المَدْرَسَةُ كَبِيرٌ", "المَدْرَسَةُ كَبِيرَةُ", "مَدْرَسَةُ الكَبِيرُ", "المَدْرَسَةِ كَبِيرَةٍ"],
+                answer: "المَدْرَسَةُ كَبِيرَةُ"
+            },
+            {
+                id: 12, type: "mc",
+                text: "مَا المَعْنَى بِاللُّغَةِ العَرَبِيَّةِ لِكَلِمَةِ 'Lift / Elevator'?",
+                image: "https://placehold.co/600x400/0891b2/ffffff?text=GAMBAR_SOAL_NO_12",
+                options: ["مصعد", "بلاط", "كَنْزُ / مَخْزَنٌ", "مَعْهَدٌ"],
+                answer: "مصعد"
+            },
+            {
+                id: 13, type: "mc",
+                text: "مَا مَعْنَى الجُمْلَةِ 'المَسْجِدُ قَرِيبٌ مِنَ الفَصْلِ'؟",
+                options: ["Masjid itu jauh dari kelas", "Masjid itu besar di dalam kelas", "Masjid itu dekat dari kelas", "Masjid itu bersih di depan kelas"],
+                answer: "Masjid itu dekat dari kelas"
+            },
+            {
+                id: 14, type: "mc",
+                text: "(SOAL PERNYATAAN 2)\nإِخْتَرُ الجُمَلَ الصَّحِيحَةَ وفقاً لِقَوَاعِدِ الْمُبْتَدَأَ وَالْخَبَرِ (Pilihlah kalimat-kalimat yang BENAR sesuai aturan Mubtada' dan Khabar):\n(1) المَلْعَبُ وَاسِعٌ\n(2) القَاعَةُ نَظِيفٌ\n(3) غُرْفَةُ الصِّحَّةِ نَظِيفَةٌ\n(4) المِصْعَدُ كَبِيرَةٌ",
+                options: ["(1) dan (3)", "(1) dan (2)", "(2) dan (3)", "(3) dan (4)"],
+                answer: "(1) dan (3)"
+            },
+            {
+                id: 15, type: "mc",
+                text: "مَا مَعْنَى كَلِمَةٍ مَخْزَنٌ / كَنْزٌ فِي المَرَافِقِ المَدْرَسِيَّةِ؟",
+                options: ["Gudang", "Asrama", "Aula", "Kamar Mandi"],
+                answer: "Gudang"
+            },
+            {
+                id: 16, type: "mc",
+                text: "مَا ضِدُّ (عَكْسُ) كَلِمَةِ نَظِيفٌ؟ (Apakah lawan kata dari نظيف ?)",
+                image: "https://placehold.co/600x400/0891b2/ffffff?text=GAMBAR_SOAL_NO_16",
+                options: ["جمِيلٌ", "مُتَّسِخ", "ضيق", "قَصِيرٌ"],
+                answer: "مُتَّسِخ"
+            },
+            {
+                id: 17, type: "mc",
+                text: "(SOAL PERNYATAAN 3)\nإِخْتَرُ المَرَافِقَ وَوَظَائِفَهَا الصَّحِيحَةُ (Pilihlah nama fasilitas dan fungsinya yang BENAR):\n(1) مَكَانُ اللَّعِب وَالرِّيَاضَةِ = مِلْعَبٌ\n(2) مَكَانُ حِرَاسَةِ الْمَدْرَسَةِ = غُرْفَةُ الْحَارِسِ\n(3) مَكَانُ الإِدَارَةِ = غُرْفَةُ السُّوُوْنِ الإِدَارِيَّةِ\n(4) مَكَانُ سَكَنِ الطَّلَّابِ = مَقْصَفٌ",
+                options: ["(1), (2), (3)", "(1), (3), (4)", "(2), (3), (4)", "كُلُّهَا صَحِيحَةً"],
+                answer: "(1), (2), (3)"
+            },
+            {
+                id: 18, type: "mc",
+                text: "مَا التَّرْجَمَةُ الصَّحِيحَةُ لِجُمْلَةِ 'Guru (laki-laki) itu pintar'",
+                options: ["الْمُدَرِّسُ كَسْلانُ", "الْمُدَرِّسُ مَاهِرٌ", "المُدَرِّسَةُ مَاهِرٌ", "الْمُدَرِّسُ جَاهِلٌ"],
+                answer: "الْمُدَرِّسُ مَاهِرٌ"
+            },
+            {
+                id: 19, type: "mc",
+                text: "مَا مَوْقِعُ كَلِمَةِ 'المَكْتَبَةُ' فِي جُمْلَةِ 'الْمَكْتَبَةُ وَاسِعَةٌ'؟",
+                options: ["خبر (Khabar)", "مُبْتَدَاً (Mubtada')", "فَاعِلٌ (Fail)", "حَرْفُ جَرِّ (Harf Jar)"],
+                answer: "مُبْتَدَاً (Mubtada')"
+            },
+            {
+                id: 20, type: "mc",
+                text: "مَا ضِدُّ (عَكْس) كَلِمَةٍ جَدِيدَ (Baru)?",
+                options: ["قَدِيمٌ", "خفيف", "ثقيل", "سيئ"],
+                answer: "قَدِيمٌ"
+            },
+            {
+                id: 21, type: "short",
+                text: "Apa arti dari fasilitas sekolah: غُرْفَةُ المُدَرِّسِ ? (Isi dengan Bahasa Indonesia, contoh: Ruang Guru)",
+                answer: "Ruang Guru"
+            },
+            {
+                id: 22, type: "checkbox",
+                text: "Manakah dari pasangan kata berikut ini yang merupakan Antonim (Lawan Kata) yang BENAR? (Jawaban lebih dari satu)",
+                options: ["طَوِيلٌ X قَصِيرٌ", "كَثِيرٌ X قَلِيلٌ", "نَظِيفٌ X جَمِيلٌ", "خَفِيفٌ X ثَقِيلٌ"],
+                answer: ["طَوِيلٌ X قَصِيرٌ", "كَثِيرٌ X قَلِيلٌ", "خَفِيفٌ X ثَقِيلٌ"]
+            }
+        ];
+
+        // ==========================================
+        // 3. UTILS & HELPERS
+        // ==========================================
+        const shuffleArray = (array) => {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        };
+
+        const Icon = ({ name, className = "w-6 h-6" }) => {
+            const icons = {
+                alert: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+                check: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+                clock: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+                send: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>,
+                chevronLeft: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>,
+                chevronRight: <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+            };
+            return icons[name] || null;
+        };
+
+        // ==========================================
+        // 4. KOMPONEN UTAMA (App)
+        // ==========================================
+        const App = () => {
+            const [view, setView] = useState('login'); // login, resume, exam, finish
+            
+            // User Data
+            const [userData, setUserData] = useState({ nama: '', kelas: '', tanggal: new Date().toISOString().split('T')[0] });
+            
+            // Exam State
+            const [questions, setQuestions] = useState([]);
+            const [answers, setAnswers] = useState({});
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [timeLeft, setTimeLeft] = useState(EXAM_CONFIG.durasiMenit * 60);
+            const [violations, setViolations] = useState(0);
+            
+            // Modals & UI States
+            const [alertModal, setAlertModal] = useState({ show: false, message: '', title: '' });
+            const [confirmModal, setConfirmModal] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [finalScore, setFinalScore] = useState(0);
+            
+            // Refs
+            const timerRef = useRef(null);
+            const violationsRef = useRef(violations);
+
+            // Sync ref with state for event listeners
+            useEffect(() => { violationsRef.current = violations; }, [violations]);
+
+            // ==========================================
+            // LIFECYCLE & AUTO-SAVE
+            // ==========================================
+            useEffect(() => {
+                const saved = localStorage.getItem(EXAM_CONFIG.storageKey);
+                if (saved) {
+                    setView('resume');
+                }
+            }, []);
+
+            useEffect(() => {
+                if (view === 'exam') {
+                    const dataToSave = { userData, questions, answers, currentIndex, timeLeft, violations };
+                    localStorage.setItem(EXAM_CONFIG.storageKey, JSON.stringify(dataToSave));
+                }
+            }, [answers, currentIndex, timeLeft, violations, view]);
+
+            // ==========================================
+            // ANTI-CHEAT (Strict Event Listeners)
+            // ==========================================
+            useEffect(() => {
+                if (view !== 'exam') return;
+
+                const handleVisibilityChange = () => {
+                    if (document.hidden && !alertModal.show && !confirmModal) {
+                        handleCheatViolation("Anda terdeteksi berpindah tab atau meminimalkan browser.");
+                    }
+                };
+                
+                const handleFullscreenChange = () => {
+                    if (!document.fullscreenElement && view === 'exam') {
+                        handleCheatViolation("Anda keluar dari mode Fullscreen (Layar Penuh).");
+                    }
+                };
+
+                const handleCopyPaste = (e) => { e.preventDefault(); };
+
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                document.addEventListener('fullscreenchange', handleFullscreenChange);
+                document.addEventListener('copy', handleCopyPaste);
+                document.addEventListener('paste', handleCopyPaste);
+                document.addEventListener('cut', handleCopyPaste);
+
+                return () => {
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+                    document.removeEventListener('copy', handleCopyPaste);
+                    document.removeEventListener('paste', handleCopyPaste);
+                    document.removeEventListener('cut', handleCopyPaste);
+                };
+            }, [view, alertModal.show, confirmModal]);
+
+            const handleCheatViolation = (reason) => {
+                const currentV = violationsRef.current + 1;
+                setViolations(currentV);
+                
+                if (currentV === 1) {
+                    setAlertModal({
+                        show: true,
+                        title: "PERINGATAN PELANGGARAN 1",
+                        message: `${reason} Ujian ini menggunakan sistem pengawasan ketat. Jika melakukan pelanggaran sekali lagi, ujian akan dihentikan paksa dan dinilai secara otomatis!`
+                    });
+                } else if (currentV >= 2) {
+                    setAlertModal({
+                        show: true,
+                        title: "UJIAN DIHENTIKAN!",
+                        message: "Anda telah melakukan pelanggaran ke-2. Sistem secara otomatis menghentikan ujian Anda."
+                    });
+                    setTimeout(() => {
+                        setAlertModal({show: false});
+                        forceSubmit("DIHENTIKAN - PELANGGARAN KEDUA");
+                    }, 4000);
+                }
+            };
+
+            // ==========================================
+            // TIMER
+            // ==========================================
+            useEffect(() => {
+                if (view === 'exam' && !isSubmitting) {
+                    timerRef.current = setInterval(() => {
+                        setTimeLeft(prev => {
+                            if (prev <= 1) {
+                                clearInterval(timerRef.current);
+                                forceSubmit("WAKTU HABIS");
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+                }
+                return () => clearInterval(timerRef.current);
+            }, [view, isSubmitting]);
+
+            // ==========================================
+            // START / RESUME / RESTART LOGIC
+            // ==========================================
+            const startNewExam = async () => {
+                try {
+                    if (document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                    }
+                } catch (e) { console.warn("Fullscreen ditolak browser"); }
+
+                const preppedQuestions = shuffleArray(rawQuestionsData).map(q => {
+                    if (q.type === 'mc' || q.type === 'checkbox') {
+                        return { ...q, options: shuffleArray(q.options) };
+                    }
+                    return q;
+                });
+
+                setQuestions(preppedQuestions);
+                setAnswers({});
+                setViolations(0);
+                setCurrentIndex(0);
+                setTimeLeft(EXAM_CONFIG.durasiMenit * 60);
+                setView('exam');
+            };
+
+            const resumeExam = async () => {
+                try {
+                    if (document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                    }
+                } catch (e) {}
+
+                const saved = JSON.parse(localStorage.getItem(EXAM_CONFIG.storageKey));
+                setUserData(saved.userData);
+                setQuestions(saved.questions);
+                setAnswers(saved.answers || {});
+                setCurrentIndex(saved.currentIndex || 0);
+                setTimeLeft(saved.timeLeft || EXAM_CONFIG.durasiMenit * 60);
+                setViolations(saved.violations || 0);
+                setView('exam');
+            };
+
+            const restartExam = () => {
+                localStorage.removeItem(EXAM_CONFIG.storageKey);
+                setView('login');
+            };
+
+            // ==========================================
+            // ANSWER HANDLING
+            // ==========================================
+            const handleAnswerChange = (qId, type, val) => {
+                setAnswers(prev => {
+                    const newAns = { ...prev };
+                    if (type === 'mc' || type === 'short') {
+                        newAns[qId] = val;
+                    } else if (type === 'checkbox') {
+                        const currentArr = newAns[qId] || [];
+                        if (currentArr.includes(val)) {
+                            newAns[qId] = currentArr.filter(v => v !== val);
+                        } else {
+                            newAns[qId] = [...currentArr, val];
+                        }
+                    }
+                    return newAns;
+                });
+            };
+
+            // ==========================================
+            // SUBMIT & SCORING
+            // ==========================================
+            const forceSubmit = (keterangan = "SELESAI NORMAL") => {
+                processSubmission(keterangan);
+            };
+
+            const processSubmission = async (keterangan) => {
+                setIsSubmitting(true);
+                clearInterval(timerRef.current);
+                
+                // Urutkan rincian jawaban berdasarkan ID asli
+                const sortedQuestions = [...questions].sort((a, b) => a.id - b.id);
+                let correctCount = 0;
+                let rincianArr = [];
+
+                sortedQuestions.forEach(q => {
+                    const userAns = answers[q.id];
+                    let isCorrect = false;
+                    let textAns = "KOSONG";
+
+                    if (userAns !== undefined && userAns !== "" && (Array.isArray(userAns) ? userAns.length > 0 : true)) {
+                        if (q.type === 'mc') {
+                            isCorrect = userAns === q.answer;
+                            textAns = userAns;
+                        } else if (q.type === 'short') {
+                            isCorrect = userAns.toString().trim().toLowerCase() === q.answer.toString().trim().toLowerCase();
+                            textAns = userAns;
+                        } else if (q.type === 'checkbox') {
+                            const sortedUserAns = [...userAns].sort().join(',');
+                            const sortedKeyAns = [...q.answer].sort().join(',');
+                            isCorrect = sortedUserAns === sortedKeyAns;
+                            textAns = userAns.join(', ');
+                        }
+
+                        if (isCorrect) {
+                            correctCount++;
+                            rincianArr.push(`Soal ${q.id}: BENAR`);
+                        } else {
+                            const kunciTeks = Array.isArray(q.answer) ? q.answer.join(', ') : q.answer;
+                            rincianArr.push(`Soal ${q.id}: SALAH (Pilih: ${textAns}, Kunci: ${kunciTeks})`);
+                        }
+                    } else {
+                        rincianArr.push(`Soal ${q.id}: KOSONG`);
+                    }
+                });
+
+                const score = Math.round((correctCount / rawQuestionsData.length) * 100);
+                setFinalScore(score);
+                const rincianStr = rincianArr.join(" | ");
+
+                const payload = {
+                    waktuSubmit: new Date().toLocaleString('id-ID'),
+                    nama: userData.nama,
+                    kelas: userData.kelas,
+                    tanggal: userData.tanggal,
+                    skor: score,
+                    pelanggaran: violationsRef.current,
+                    keterangan: keterangan,
+                    rincianJawaban: rincianStr
+                };
+
+                try {
+                    await fetch(EXAM_CONFIG.googleSheetUrl, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (err) {
+                    console.error("Gagal mengirim ke server:", err);
+                }
+
+                if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(e => console.log(e));
+                }
+                
+                localStorage.removeItem(EXAM_CONFIG.storageKey);
+                setView('finish');
+                setIsSubmitting(false);
+            };
+
+            // ==========================================
+            // RENDERING VIEWS
+            // ==========================================
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+                const s = (seconds % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            if (view === 'login') {
+                return (
+                    <div className="flex items-center justify-center min-h-screen p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+                            <div className="text-center mb-8">
+                                <h1 className="text-2xl font-bold text-cyan-700">{EXAM_CONFIG.mapel}</h1>
+                                <p className="text-slate-500 text-sm mt-1">{EXAM_CONFIG.jenisUjian} - KELAS {EXAM_CONFIG.kelas}</p>
+                            </div>
+                            <div className="space-y-5">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
+                                    <input type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-cyan-500 outline-none" 
+                                        value={userData.nama} onChange={e => setUserData({...userData, nama: e.target.value})} placeholder="Masukkan Nama Lengkap" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Kelas</label>
+                                    <input type="text" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-cyan-500 outline-none" 
+                                        value={userData.kelas} onChange={e => setUserData({...userData, kelas: e.target.value})} placeholder="Contoh: VIII-A" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Ujian</label>
+                                    <input type="date" className="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-cyan-500 outline-none" 
+                                        value={userData.tanggal} onChange={e => setUserData({...userData, tanggal: e.target.value})} />
+                                </div>
+                                <button 
+                                    onClick={startNewExam}
+                                    disabled={!userData.nama || !userData.kelas}
+                                    className="w-full bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 text-white font-bold py-3 rounded-lg transition mt-4">
+                                    Mulai Ujian
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (view === 'resume') {
+                return (
+                    <div className="flex items-center justify-center min-h-screen p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+                            <Icon name="alert" className="w-16 h-16 text-orange-500 mx-auto mb-4" />
+                            <h2 className="text-xl font-bold text-slate-800 mb-2">Sesi Ujian Tersimpan Ditemukan!</h2>
+                            <p className="text-slate-600 mb-6 text-sm">Sistem mendeteksi Anda memiliki progres ujian yang belum disubmit secara permanen. Apakah Anda ingin melanjutkan?</p>
+                            <div className="space-y-3">
+                                <button onClick={resumeExam} className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg transition">Lanjutkan Ujian</button>
+                                <button onClick={restartExam} className="w-full bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold py-3 rounded-lg transition">Mulai Ulang (Hapus Progres)</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (view === 'finish') {
+                return (
+                    <div className="flex items-center justify-center min-h-screen p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+                            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Icon name="check" className="w-10 h-10" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Ujian Selesai</h2>
+                            <p className="text-slate-600 mb-6">Terima kasih, data ujian Anda telah berhasil dikirim ke server.</p>
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                <p className="text-sm text-slate-500 mb-1">Skor Anda:</p>
+                                <p className="text-4xl font-black text-cyan-600">{finalScore}</p>
+                            </div>
+                            <button onClick={() => window.location.reload()} className="mt-6 w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3 rounded-lg transition">Kembali ke Beranda</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ==========================================
+            // EXAM UI
+            // ==========================================
+            const currentQuestion = questions[currentIndex];
+
+            return (
+                <div className="min-h-screen flex flex-col bg-slate-50">
+                    {/* STATIC MODALS (Anti-Flicker) */}
+                    {alertModal.show && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl text-center">
+                                <Icon name="alert" className="w-12 h-12 text-rose-600 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">{alertModal.title}</h3>
+                                <p className="text-slate-600 text-sm mb-6">{alertModal.message}</p>
+                                <button onClick={() => setAlertModal({show: false})} className="w-full bg-rose-600 text-white font-bold py-2.5 rounded-lg">Saya Mengerti</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {confirmModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl text-center">
+                                <h3 className="text-lg font-bold text-slate-800 mb-2">Selesai & Kumpulkan?</h3>
+                                <p className="text-slate-600 text-sm mb-6">Pastikan semua jawaban sudah terisi. Anda tidak dapat kembali setelah ini.</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setConfirmModal(false)} className="flex-1 bg-slate-200 text-slate-800 font-bold py-2.5 rounded-lg">Batal</button>
+                                    <button onClick={() => { setConfirmModal(false); forceSubmit("SELESAI NORMAL"); }} className="flex-1 bg-cyan-600 text-white font-bold py-2.5 rounded-lg">Ya, Kumpulkan</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* HEADER */}
+                    <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-30">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                            <div>
+                                <h1 className="font-bold text-cyan-700 text-lg sm:text-xl truncate max-w-[200px] sm:max-w-md">{EXAM_CONFIG.mapel}</h1>
+                                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">{EXAM_CONFIG.jenisUjian} • KELAS {EXAM_CONFIG.kelas}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono font-bold text-lg ${timeLeft < 300 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>
+                                    <Icon name="clock" className="w-5 h-5" /> {formatTime(timeLeft)}
+                                </div>
+                                <div className="hidden sm:block text-right">
+                                    <p className="text-sm font-bold text-slate-800">{userData.nama}</p>
+                                    <p className="text-xs text-slate-500">{userData.kelas}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* MAIN CONTENT */}
+                    <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 flex flex-col lg:flex-row gap-6">
+                        
+                        {/* LEFT: QUESTION AREA */}
+                        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
+                            <div className="p-6 flex-1 overflow-y-auto">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-lg font-bold text-slate-800">Soal Nomor {currentIndex + 1}</h2>
+                                    <span className="bg-cyan-100 text-cyan-800 text-xs font-
